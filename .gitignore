@@ -1,0 +1,9 @@
+# JS
+node_modules/
+.env
+package-lock.json
+
+# Python
+servers/.venv/
+__pycache__/
+*.pyc
