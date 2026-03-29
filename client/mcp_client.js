@@ -1,61 +1,56 @@
-import { GoogleGenAI } from "@google/genai";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { config } from "dotenv";
+import config from "../config/servers_config.json" with { type: "json" };
 
-config();
+// Init servers using client
+export async function initClients() {
+    const clients = {};
 
-const ai = new GoogleGenAI({});
-
-const transport = new StdioClientTransport({
-    command: "cmd",
-    args: ["/c", "cd", "d:\\MyProjectsAndTools\\Aura\\servers\\python", "&&", "uv", "run", "python", "weather_server.py"],
-});
-
-const client = new Client({ name: "my-client", version: "1.0.0" });
-await client.connect(transport);
-
-let tools = []; // List of tools from MCP server and format them for use in the Google GenAI config
-await client.listTools().then((response) => {
-    // Format each tool from the MCP server according to the expected format for function declarations in the Google GenAI config
-    response.tools.forEach((tool) => {
-        tools.push({
-            name: tool.name,
-            description: tool.description,
-            parameters: {
-                type: tool.inputSchema.type,
-                properties: tool.inputSchema.properties,
-                required: tool.inputSchema.required,
-            },
-        });
-    });
-});
-
-const aiResponse = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: "whats the weather in london",
-    config: {
-        tools: [
-            {
-                functionDeclarations: tools,
-            },
-        ],
-    },
-});
-
-// Check for fn call in AI response and call each tool via MCP client
-if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
-    console.log("AI Response: ", aiResponse.functionCalls);
-
-    aiResponse.functionCalls.forEach(async (fnCall) => {
-        const result = await client.callTool({
-            name: fnCall.name,
-            arguments: fnCall.args,
+    for (const [name, cfg] of Object.entries(config.mcpServers)) {
+        const transport = new StdioClientTransport({
+            command: cfg.command,
+            args: cfg.args,
         });
 
-        console.log("Result from tool call: ", result);
+        const client = new Client({ name: `${name}-client`, version: "1.0.0" });
+        await client.connect(transport);
+
+        clients[name] = client;
+    }
+
+    return clients;
+}
+
+// Get all tools from clients and format them acc to gemini config.
+export async function getAllTools(clients) {
+    const tools = [];
+
+    for (const client of Object.values(clients)) {
+        const response = await client.listTools();
+        response.tools.forEach((tool) => {
+            tools.push({
+                _client: client, // store which client owns this tool
+                name: tool.name,
+                description: tool.description,
+                parameters: {
+                    type: tool.inputSchema.type,
+                    properties: tool.inputSchema.properties,
+                    required: tool.inputSchema.required,
+                },
+            });
+        });
+    }
+
+    return tools;
+}
+
+// Call specific tool
+export async function callTool(tools, name, args) {
+    const tool = tools.find((t) => t.name === name);
+    if (!tool) throw new Error(`Tool ${name} not found`);
+
+    return await tool._client.callTool({
+        name: name,
+        arguments: args,
     });
-} else {
-    console.log("No Function call required.");
-    console.log("AI Response: ", aiResponse.text);
 }
