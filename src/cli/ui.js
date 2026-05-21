@@ -1,5 +1,11 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
+import { marked } from "marked";
+import TerminalRenderer from "marked-terminal";
+
+marked.setOptions({
+    renderer: new TerminalRenderer()
+});
 
 export function showIntro() {
     p.intro(pc.bgCyan(pc.black(" Aura MCP Chat CLI ")));
@@ -25,7 +31,8 @@ export async function getUserInput() {
 
 export function printAIResponse(text, provider = "Cloud") {
     const providerTag = pc.gray(`[${provider}]`);
-    console.log(`\n${pc.cyan("AI:")} ${providerTag} ${text}\n`);
+    const renderedText = marked(text).trim();
+    console.log(`\n${pc.cyan("AI:")} ${providerTag}\n${renderedText}\n`);
 }
 
 export function printError(msg) {
