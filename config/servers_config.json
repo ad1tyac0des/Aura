@@ -1,11 +1,9 @@
 {
     "mcpServers": {
         "weather": {
-            "command": "uv",
+            "command": "node",
             "args": [
-                "run",
-                "python",
-                "./servers/python/weather_server.py"
+                "./servers/weather_server.js"
             ]
         }
     }
