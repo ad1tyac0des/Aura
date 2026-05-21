@@ -5,6 +5,12 @@
             "args": [
                 "./servers/weather_server.js"
             ]
+        },
+        "pc_control": {
+            "command": "node",
+            "args": [
+                "./servers/pc_control_server.js"
+            ]
         }
     }
 }

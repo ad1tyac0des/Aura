@@ -3,11 +3,15 @@ import { initClients, getAllTools } from "./src/mcp/client.js";
 import { showIntro, getUserInput, printAIResponse, printError, createSpinner } from "./src/cli/ui.js";
 import { processCommand } from "./src/cli/commands.js";
 import { createChatSession, sendChatMessage } from "./src/ai/chat.js";
+import os from "os";
 
 config();
 
 const appState = {
-    systemInstruction: null,
+    systemInstruction: `You are Aura, a powerful AI assistant. 
+System Context:
+- Operating System: ${os.type()} ${os.release()} (${os.platform()} ${os.arch()})
+- Current Local Time: ${new Date().toString()}`,
     requiresReinitialization: true,
     chat: null
 };
@@ -47,8 +51,8 @@ async function main() {
         if (isCommand) continue;
 
         try {
-            const responseText = await sendChatMessage(appState.chat, tools, userInput, s);
-            printAIResponse(responseText);
+            const response = await sendChatMessage(appState.chat, tools, userInput, s);
+            printAIResponse(response.text, response.provider);
         } catch (error) {
             printError(error.message);
         }

@@ -23,8 +23,9 @@ export async function getUserInput() {
     return userInput.trim();
 }
 
-export function printAIResponse(text) {
-    console.log(`\n${pc.cyan("AI:")} ${text}\n`);
+export function printAIResponse(text, provider = "Cloud") {
+    const providerTag = pc.gray(`[${provider}]`);
+    console.log(`\n${pc.cyan("AI:")} ${providerTag} ${text}\n`);
 }
 
 export function printError(msg) {
