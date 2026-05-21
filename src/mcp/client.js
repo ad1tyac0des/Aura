@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import config from "../config/servers_config.json" with { type: "json" };
+import config from "../../config/servers_config.json" with { type: "json" };
 
 // Init servers using client
 export async function initClients() {

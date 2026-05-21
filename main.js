@@ -1,82 +1,56 @@
-import { GoogleGenAI } from "@google/genai";
-import { initClients, getAllTools, callTool } from "./client/mcp_client.js";
 import { config } from "dotenv";
-import * as p from "@clack/prompts";
-import pc from "picocolors";
+import { initClients, getAllTools } from "./src/mcp/client.js";
+import { showIntro, getUserInput, printAIResponse, printError, createSpinner } from "./src/cli/ui.js";
+import { processCommand } from "./src/cli/commands.js";
+import { createChatSession, sendChatMessage } from "./src/ai/chat.js";
 
 config();
 
-const ai = new GoogleGenAI({});
+const appState = {
+    systemInstruction: null,
+    requiresReinitialization: true,
+    chat: null
+};
 
 async function main() {
-    p.intro(pc.bgCyan(pc.black(" AGENT AURA ")));
+    showIntro();
 
-    const s = p.spinner();
+    const s = createSpinner();
     s.start("Initializing MCP servers...");
     
     const clients = await initClients();
     const tools = await getAllTools(clients);
     
-    s.stop("MCP servers initialized");
-
-    const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
-        config: {
-            tools: [{ functionDeclarations: tools.map(t => ({ name: t.name, description: t.description, parameters: t.parameters })) }],
-        },
-    });
+    s.stop("MCP servers initialized. Type 'help' for available commands.");
 
     while (true) {
-        const userInput = await p.text({
-            message: pc.green("You:"),
-            placeholder: "Type a message or 'exit' to quit",
-        });
-
-        if (p.isCancel(userInput) || userInput.trim().toLowerCase() === "exit") {
-            p.outro(pc.cyan("Goodbye!"));
-            process.exit(0);
+        if (appState.requiresReinitialization) {
+            let history = undefined;
+            if (appState.chat) {
+                try {
+                    // Try to retrieve existing history if supported
+                    history = await appState.chat.getHistory();
+                } catch (e) {
+                    // Fallback to empty history if not available
+                    history = undefined;
+                }
+            }
+            appState.chat = createChatSession(tools, appState.systemInstruction, history);
+            appState.requiresReinitialization = false;
         }
 
-        if (!userInput.trim()) continue;
+        const userInput = await getUserInput();
 
-        s.start("AURA is thinking...");
+        if (!userInput) continue;
+
+        const isCommand = await processCommand(userInput, appState);
+        if (isCommand) continue;
 
         try {
-            let result = await chat.sendMessage({ message: userInput });
-
-            while (result.functionCalls && result.functionCalls.length > 0) {
-                s.message(`Running tool(s): ${result.functionCalls.map(f => f.name).join(", ")}...`);
-                
-                const functionResponsesParts = [];
-                for (const fnCall of result.functionCalls) {
-                    try {
-                        const toolResult = await callTool(tools, fnCall.name, fnCall.args);
-                        functionResponsesParts.push({
-                            functionResponse: {
-                                name: fnCall.name,
-                                response: { result: toolResult },
-                            }
-                        });
-                    } catch (error) {
-                        functionResponsesParts.push({
-                            functionResponse: {
-                                name: fnCall.name,
-                                response: { error: String(error) },
-                            }
-                        });
-                    }
-                }
-                
-                s.message("Processing tool results...");
-                result = await chat.sendMessage({ message: functionResponsesParts });
-            }
-
-            s.stop("Response received");
-            console.log(`\n${pc.cyan("AURA:")} ${result.text}\n`);
-            
+            const responseText = await sendChatMessage(appState.chat, tools, userInput, s);
+            printAIResponse(responseText);
         } catch (error) {
-            s.stop("Error occurred");
-            p.log.error(error.message);
+            printError(error.message);
         }
     }
 }
