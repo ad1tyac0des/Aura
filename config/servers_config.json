@@ -11,6 +11,12 @@
             "args": [
                 "./servers/pc_control_server.js"
             ]
+        },
+        "calculator": {
+            "command": "node",
+            "args": [
+                "./servers/calculator_server.js"
+            ]
         }
     }
 }
